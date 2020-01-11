@@ -1,4 +1,4 @@
-package com.deemo.gesture.service;
+package com.deemo.library.gesture.service;
 
 
 import android.accessibilityservice.AccessibilityService;
