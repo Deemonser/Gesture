@@ -16,12 +16,14 @@ import android.view.View
  */
 class GestureView : View {
 
-    val pathList: ArrayList<Path> = arrayListOf()
-    val dotList: ArrayList<Pair<Float, Float>> = arrayListOf()
+    val swipeList: ArrayList<Swipe> = arrayListOf()
+
+    val pointList: ArrayList<Point> = arrayListOf()
 
     private val paint by lazy { Paint() }
 
-    private var actionListener: ((ArrayList<Pair<Float, Float>>, ArrayList<Path>) -> Unit)? = null
+    private var actionListener: ((ArrayList<Point>, ArrayList<Swipe>) -> Unit)? =
+        null
 
     constructor(context: Context?) : super(context)
 
@@ -54,32 +56,35 @@ class GestureView : View {
 
         paint.setColor(Color.BLACK)
         paint.strokeWidth = 8f
+
+
     }
 
-    private var path: Path? = null
+    private var pathList: ArrayList<Point>? = null
+    private var lastDownTime = 0L
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
 
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
-                dotList.add(Pair(event.x, event.y))
+                pointList.add(Point(event.x, event.y))
+                lastDownTime = System.currentTimeMillis()
             }
             MotionEvent.ACTION_UP -> {
-                path?.let {
-                    pathList.add(it)
+                pathList?.let {
+                    swipeList.add(Swipe(it, System.currentTimeMillis() - lastDownTime))
                 }
-                path = null
+                pathList = null
             }
+
             MotionEvent.ACTION_MOVE -> {
-                if (path == null) {
-                    path = Path().apply {
-                        val last = dotList.last()
-                        this.moveTo(last.first, last.second)
-                    }
+                if (pathList == null) {
+                    val last = pointList.last()
+                    pathList = arrayListOf(last)
                 }
 
-                path?.let {
-                    it.lineTo(event.x, event.y)
+                pathList?.let {
+                    it.add(Point(event.x, event.y))
                 }
             }
         }
@@ -88,7 +93,7 @@ class GestureView : View {
 
         if (event.action == MotionEvent.ACTION_UP) {
             actionListener?.let {
-                it(dotList, pathList)
+                it(pointList, swipeList)
             }
         }
 
@@ -99,32 +104,47 @@ class GestureView : View {
         canvas.drawColor(Color.WHITE)
 
         paint.style = Paint.Style.FILL
-        dotList.forEach {
-            canvas.drawCircle(it.first, it.second, paint.strokeWidth / 2, paint)
+        pointList.forEach {
+            canvas.drawCircle(it.x, it.y, paint.strokeWidth / 2, paint)
         }
 
         paint.style = Paint.Style.STROKE
-        pathList.forEach {
-            canvas.drawPath(it, paint)
+        swipeList.forEach {
+            canvas.drawPath(toPath(it.paths), paint)
         }
 
 
-        path?.let {
-            canvas.drawPath(it, paint)
+        pathList?.let {
+            canvas.drawPath(toPath(it), paint)
         }
 
     }
 
+    private fun toPath(list: ArrayList<Point>): Path {
+        val path = Path()
+        list.forEachIndexed { index, pair ->
+            if (index == 0) {
+                path.moveTo(pair.x, pair.y)
+            } else {
+                path.lineTo(pair.x, pair.y)
+            }
+        }
+        return path
+    }
 
     fun reset() {
-        path = null
-        pathList.clear()
-        dotList.clear()
+        pathList = null
+        swipeList.clear()
+        pointList.clear()
 
         invalidate()
     }
 
-    fun setActionListener(listener: (dots:ArrayList<Pair<Float, Float>>, paths:ArrayList<Path>) -> Unit) {
+    fun setActionListener(listener: (points: ArrayList<Point>, paths: ArrayList<Swipe>) -> Unit) {
         actionListener = listener
     }
+
+
+    data class Point(val x: Float, val y: Float)
+    data class Swipe(val paths: ArrayList<Point>, val duration: Long)
 }
